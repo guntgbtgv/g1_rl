@@ -123,8 +123,8 @@ def get_cfgs():
             # "right_wrist_yaw_joint",
         ],
         # PD
-        "kp": 20.0,
-        "kd": 0.5,
+        "kp": 50.0,
+        "kd": 1,
         # termination
         "termination_if_roll_greater_than": 30,  # degree
         "termination_if_pitch_greater_than": 20,
@@ -155,12 +155,12 @@ def get_cfgs():
         "reward_scales": {
             "tracking_lin_vel": 1.0,
             "tracking_ang_vel": 0.2,
-            "lin_vel_z": -1.0,
+            # "lin_vel_z": -1.0,
             "base_height": -50.0,
             "action_rate": -0.005,
-            "similar_to_default": -0.1,
-            "base_pitch": -50.0,
-            "base_roll": -50.0,
+            "similar_to_default": -0.01,
+            "base_pitch": -1.0,
+            "base_roll": -1.0,
         },
     }
     command_cfg = {
@@ -175,7 +175,7 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="g1-standing")
+    parser.add_argument("-e", "--exp_name", type=str, default="g1-walking05")
     parser.add_argument("-B", "--num_envs", type=int, default=4096)
     parser.add_argument("--max_iterations", type=int, default=1000)
     args = parser.parse_args()
