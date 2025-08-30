@@ -2,8 +2,9 @@ import torch
 import math
 import genesis as gs
 from genesis.utils.geom import quat_to_xyz, transform_by_quat, inv_quat, transform_quat_by_quat
-
+import numpy as np
 from Genesis.genesis.engine.entities.rigid_entity import RigidLink
+from Genesis.tests.conftest import show_viewer
 
 
 def gs_rand_float(lower, upper, shape, device):
@@ -71,7 +72,7 @@ class G1Env:
         # build
         self.scene.build(n_envs=num_envs, env_spacing=(1.0, 1.0))
 
-        print("robot.get_link(name='torso_link').get_pos(): ",self.robot.get_link(name='torso_link').get_pos())
+        print("robot.get_link(name='right_ankle_roll_link').get_pos(): ",self.robot.get_link(name='right_ankle_roll_link').idx_local )
         print("robot.get_pos(): ",self.robot.get_pos())
 
         # names to indices
@@ -149,12 +150,12 @@ class G1Env:
         self.projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat)
         self.dof_pos[:] = self.robot.get_dofs_position(self.motor_dofs)
         self.dof_vel[:] = self.robot.get_dofs_velocity(self.motor_dofs)
-        period = 0.8
+        period = 0.5
         offset = 0.5
         self.phase[:] = (self.episode_length_buf[:].unsqueeze(1) * self.dt) % period / period
         self.phase_left[:] = self.phase[:]
         self.phase_right[:] = (self.phase[:] + offset) % 1
-        # print('contact: ', self.robot.get_links_net_contact_force()[:, 15, 2])
+        # print('contact: ', self.robot.get_links_net_contact_force()[0, :, :])
 
         # resample commands
         envs_idx = (
@@ -190,11 +191,11 @@ class G1Env:
                 self.base_ang_vel * self.obs_scales["ang_vel"],  # 3
                 self.projected_gravity,  # 3
                 self.commands * self.commands_scale,  # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 15
-                self.dof_vel * self.obs_scales["dof_vel"],  # 15
+                (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 23
+                self.dof_vel * self.obs_scales["dof_vel"],  # 23
                 sin_phase,  # 1
                 cos_phase, #1
-                self.actions,  # 15
+                self.actions,  # 23
             ],
             axis=-1,
         )
@@ -203,6 +204,9 @@ class G1Env:
         self.last_dof_vel[:] = self.dof_vel[:]
 
         self.extras["observations"]["critic"] = self.obs_buf
+
+        # cam_pos= np.array(self.base_pos[0].tolist()) + np.array([0.0, 2.5, 0.0])
+        # self.scene.viewer.set_camera_pose(pos=cam_pos, lookat=self.base_pos[0].tolist())
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
 
@@ -218,7 +222,7 @@ class G1Env:
             return
 
         # reset dofs
-        self.dof_pos[envs_idx] = -0.1*torch.ones_like(self.default_dof_pos, device=gs.device) + 0.2*torch.rand_like(self.default_dof_pos, device=gs.device) # self.default_dof_pos
+        self.dof_pos[envs_idx] = self.default_dof_pos -0.1*torch.ones_like(self.default_dof_pos, device=gs.device) + 0.2*torch.rand_like(self.default_dof_pos, device=gs.device) # self.default_dof_pos
         self.dof_vel[envs_idx] = 0.0
         self.robot.set_dofs_position(
             position=self.dof_pos[envs_idx],
@@ -279,12 +283,18 @@ class G1Env:
     def _reward_similar_to_default(self):
         # Penalize joint poses far away from default pose
         weight = torch.ones_like(self.default_dof_pos)
-        # weight[self.env_cfg["dof_names"].index("left_hip_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("left_hip_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("left_hip_roll_joint")] = self.reward_cfg["dof_similar_weight"]
         weight[self.env_cfg["dof_names"].index("left_knee_joint")] = self.reward_cfg["dof_similar_weight"]
-        # weight[self.env_cfg["dof_names"].index("right_hip_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("right_hip_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("right_hip_roll_joint")] = self.reward_cfg["dof_similar_weight"]
         weight[self.env_cfg["dof_names"].index("right_knee_joint")] = self.reward_cfg["dof_similar_weight"]
-        weight[self.env_cfg["dof_names"].index("waist_roll_joint")] = self.reward_cfg["dof_similar_weight"]
-        weight[self.env_cfg["dof_names"].index("waist_yaw_joint")] = self.reward_cfg["dof_similar_weight"]
+        # weight[self.env_cfg["dof_names"].index("waist_roll_joint")] = self.reward_cfg["dof_similar_weight"]
+        # weight[self.env_cfg["dof_names"].index("waist_yaw_joint")] = self.reward_cfg["dof_similar_weight"]
+        # weight[self.env_cfg["dof_names"].index("left_shoulder_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        # weight[self.env_cfg["dof_names"].index("right_shoulder_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("right_ankle_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
+        weight[self.env_cfg["dof_names"].index("left_ankle_pitch_joint")] = self.reward_cfg["dof_similar_weight"]
         return torch.sum(torch.abs((self.dof_pos - self.default_dof_pos)*weight), dim=1)
 
     def _reward_base_height(self):
@@ -292,12 +302,14 @@ class G1Env:
         return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
 
     def _reward_base_pitch(self):
-        # Penalize base quat away from target
-        return torch.square(self.base_euler[:, 1] - self.reward_cfg["base_pitch_target"])
+        # tracking base quat
+        pitch_error = torch.square(self.base_euler[:, 1] - self.reward_cfg["base_pitch_target"])
+        return torch.exp(-pitch_error / self.reward_cfg["tracking_sigma"])
 
     def _reward_base_roll(self):
-        # Penalize base quat away from target
-        return torch.square(self.base_euler[:, 0] - self.reward_cfg["base_roll_target"])
+        # tracking base quat
+        roll_error = torch.square(self.base_euler[:, 0] - self.reward_cfg["base_roll_target"])
+        return torch.exp(-roll_error / self.reward_cfg["tracking_sigma"])
 
     def _reward_base_pitch_rate(self):
         # Penalize base pitch rotation
@@ -306,17 +318,25 @@ class G1Env:
     def _reward_stance_contact(self):
         # Contact at the stance phase
         # res = torch.zeros(self.num_envs, device=gs.device)
-        is_stance_left = self.phase_left[:].squeeze(1) < 0.55
-        is_stance_right = self.phase_right[:].squeeze(1) < 0.55
-        contact_left = self.robot.get_links_net_contact_force()[:, 14, 2] > 1
-        contact_right = self.robot.get_links_net_contact_force()[:, 15, 2] > 1
+        is_stance_left = self.phase_left[:].squeeze(1) < 0.4
+        is_stance_right = self.phase_right[:].squeeze(1) < 0.4
+        contact_left = self.robot.get_links_net_contact_force()[:, self.robot.get_link(name='left_ankle_roll_link').idx_local, 2] > 1
+        contact_right = self.robot.get_links_net_contact_force()[:, self.robot.get_link(name='right_ankle_roll_link').idx_local, 2] > 1
         return ~(contact_left ^ is_stance_left + contact_right ^ is_stance_right)
 
     def _reward_feet_swing_height(self):
-        contact = torch.norm(self.robot.get_links_net_contact_force()[:, [14,15], :3], dim=2) > 1.
+        contact = torch.norm(self.robot.get_links_net_contact_force()[:, [self.robot.get_link(name='left_ankle_roll_link').idx_local,self.robot.get_link(name='right_ankle_roll_link').idx_local], :3], dim=2) > 1.
         feet_pos = torch.zeros((self.num_envs, 2, 3), device=gs.device, dtype=gs.tc_float)
         feet_pos[:, 0, :] = self.robot.get_link(name="left_ankle_roll_link").get_pos()[:]
         feet_pos[:, 1, :] = self.robot.get_link(name="right_ankle_roll_link").get_pos()[:]
         # print('feet_pos: ', feet_pos)
-        pos_error = torch.square( feet_pos[:, :, 2] - 0.08) * ~contact
+        pos_error = torch.square( feet_pos[:, :, 2] - self.reward_cfg["feet_height_target"]) * ~contact
         return torch.sum(pos_error, dim=(1))
+
+    def _reward_apex_height(self):
+        # Penalize base height away from target
+        is_stance_left = self.phase_left[:].squeeze(1) < 0.4
+        is_stance_right = self.phase_right[:].squeeze(1) < 0.4
+        contact_left = self.robot.get_links_net_contact_force()[:, self.robot.get_link(name='left_ankle_roll_link').idx_local, 2] > 1
+        contact_right = self.robot.get_links_net_contact_force()[:, self.robot.get_link(name='right_ankle_roll_link').idx_local, 2] > 1
+        return (~(contact_left | is_stance_left) & ~(contact_right | is_stance_right)) * self.base_pos[:, 2]

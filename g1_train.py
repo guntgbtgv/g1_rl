@@ -24,7 +24,7 @@ def get_train_cfg(exp_name, max_iterations):
     train_cfg_dict = {
         "algorithm": {
             "class_name": "PPO",
-            "clip_param": 0.2,
+            "clip_param": 0.1,
             "desired_kl": 0.01,
             "entropy_coef": 0.01,
             "gamma": 0.99,
@@ -68,7 +68,7 @@ def get_train_cfg(exp_name, max_iterations):
 
 def get_cfgs():
     env_cfg = {
-        "num_actions": 15,
+        "num_actions": 23,
         # joint/link names
         "default_joint_angles": {  # [rad]
             "left_hip_pitch_joint": -0.1,
@@ -86,17 +86,17 @@ def get_cfgs():
             "waist_yaw_joint": 0.0,
             "waist_roll_joint": 0.0,
             "waist_pitch_joint": 0.0,
-            # "left_shoulder_pitch_joint": 0.0,
-            # "left_shoulder_roll_joint": 0.0,
-            # "left_shoulder_yaw_joint": 0.0,
-            # "left_elbow_joint": 0.0,
+            "left_shoulder_pitch_joint": 0.0,
+            "left_shoulder_roll_joint": 0.25,
+            "left_shoulder_yaw_joint": 0.0,
+            "left_elbow_joint": 1.5,
             # "left_wrist_roll_joint": 0.0,
             # "left_wrist_pitch_joint": 0.0,
             # "left_wrist_yaw_joint": 0.0,
-            # "right_shoulder_pitch_joint": 0.0,
-            # "right_shoulder_roll_joint": 0.0,
-            # "right_shoulder_yaw_joint": 0.0,
-            # "right_elbow_joint": 0.0,
+            "right_shoulder_pitch_joint": 0.0,
+            "right_shoulder_roll_joint": -0.25,
+            "right_shoulder_yaw_joint": 0.0,
+            "right_elbow_joint": 1.5,
             # "right_wrist_roll_joint": 0.0,
             # "right_wrist_pitch_joint": 0.0,
             # "right_wrist_yaw_joint": 0.0,
@@ -117,17 +117,17 @@ def get_cfgs():
             "waist_yaw_joint",
             "waist_roll_joint",
             "waist_pitch_joint",
-            # "left_shoulder_pitch_joint",
-            # "left_shoulder_roll_joint",
-            # "left_shoulder_yaw_joint",
-            # "left_elbow_joint",
+            "left_shoulder_pitch_joint",
+            "left_shoulder_roll_joint",
+            "left_shoulder_yaw_joint",
+            "left_elbow_joint",
             # "left_wrist_roll_joint",
             # "left_wrist_pitch_joint",
             # "left_wrist_yaw_joint",
-            # "right_shoulder_pitch_joint",
-            # "right_shoulder_roll_joint",
-            # "right_shoulder_yaw_joint",
-            # "right_elbow_joint",
+            "right_shoulder_pitch_joint",
+            "right_shoulder_roll_joint",
+            "right_shoulder_yaw_joint",
+            "right_elbow_joint",
             # "right_wrist_roll_joint",
             # "right_wrist_pitch_joint",
             # "right_wrist_yaw_joint",
@@ -139,7 +139,7 @@ def get_cfgs():
         "termination_if_roll_greater_than": 30,  # degree
         "termination_if_pitch_greater_than": 30,
         # base pose
-        "base_init_pos": [0.0, 0.0, 0.8],
+        "base_init_pos": [0.0, 0.0, 0.83],
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 20.0,
         "resampling_time_s": 4.0,
@@ -148,7 +148,7 @@ def get_cfgs():
         "clip_actions": 100.0,
     }
     obs_cfg = {
-        "num_obs": 56,
+        "num_obs": 80,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -157,29 +157,30 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.25,
-        "base_height_target": 0.78,
-        "feet_height_target": 0.075,
+        "tracking_sigma": 1.5,
+        "base_height_target": 0.85,
+        "feet_height_target": 0.1,
         "base_pitch_target": 0.0,
         "base_roll_target": 0.0,
-        "dof_similar_weight": 0.001,
+        "dof_similar_weight": 0.0001,
         "reward_scales": {
             "tracking_lin_vel": 2.0,
             "tracking_ang_vel": 1.0,
-            "lin_vel_z": -5.0,
-            "base_height": -10.0,
+            # "lin_vel_z": -5.0,
+            # "base_height": -1000.0,
+            "apex_height": 10.0,
             "action_rate": -0.005,
             "similar_to_default": -0.5,
-            "base_pitch": -0.1,
-            "base_roll": -0.1,
-            "base_pitch_rate": -0.1,
+            "base_pitch": 1.0,
+            "base_roll": 1.0,
+            "base_pitch_rate": -1.0,
             "stance_contact": 5.0,
-            "feet_swing_height": -50.0,
+            # "feet_swing_height": -50.0,
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [0.5, 0.5],
+        "lin_vel_x_range": [2.0, 2.0],
         "lin_vel_y_range": [0, 0],
         "ang_vel_range": [0, 0],
     }
@@ -189,9 +190,9 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="g1-walking05_19Jun2025_3")
-    parser.add_argument("-B", "--num_envs", type=int, default=4096)
-    parser.add_argument("--max_iterations", type=int, default=5001)
+    parser.add_argument("-e", "--exp_name", type=str, default="g1-walking20_8Jul2025_2")
+    parser.add_argument("-B", "--num_envs", type=int, default=2048)
+    parser.add_argument("--max_iterations", type=int, default=4001)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
